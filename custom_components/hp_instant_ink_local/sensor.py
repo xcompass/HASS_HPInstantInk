@@ -81,7 +81,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     for resource in config[CONF_RESOURCES]:
         sensors.append(HPPrinterSensor(resource, rest))
 
-    add_devices(sensors, True)
+    add_entities(sensors, True)
 
 
 class HPPrinterSensor(Entity):
