@@ -35,9 +35,8 @@ from datetime import datetime, timedelta
 import homeassistant.helpers.config_validation as cv
 import requests
 import voluptuous as vol
-from homeassistant.components.sensor import PLATFORM_SCHEMA
+from homeassistant.components.sensor import SensorEntity
 from homeassistant.const import ATTR_ATTRIBUTION, CONF_NAME, CONF_RESOURCES
-from homeassistant.helpers.entity import Entity
 from homeassistant.util import Throttle
 
 _LOGGER = logging.getLogger(__name__)
@@ -69,7 +68,7 @@ SENSOR_TYPES = {
     'cr': ['HP Printer Colour Remaining', ' '],
 }
 
-PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
+PLATFORM_SCHEMA = cv.PLATFORM_SCHEMA.extend({
     vol.Required(CONF_RESOURCES):
         vol.All(cv.ensure_list, [vol.In(SENSOR_TYPES)]),
 })
@@ -84,7 +83,7 @@ def setup_platform(hass, config, add_entities, discovery_info=None):
     add_entities(sensors, True)
 
 
-class HPPrinterSensor(Entity):
+class HPPrinterSensor(SensorEntity):
     """Implementing the HP Printer sensor."""
 
     def __init__(self, sensor_type, rest):
@@ -107,12 +106,12 @@ class HPPrinterSensor(Entity):
         return DEFAULT_ICON
 
     @property
-    def state(self):
+    def native_value(self):
         """Return the state of the sensor."""
         return self._state
 
     @property
-    def unit_of_measurement(self):
+    def native_unit_of_measurement(self):
         """Return the unit of measurement of this entity, if any."""
         return self._unit_of_measurement
 
