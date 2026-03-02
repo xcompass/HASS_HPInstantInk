@@ -81,7 +81,7 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     for resource in config[CONF_RESOURCES]:
         sensors.append(HPPrinterSensor(resource, rest))
 
-    add_devices(sensors, True)
+    add_entities(sensors, True)
 
 
 class HPPrinterSensor(Entity):
@@ -117,7 +117,7 @@ class HPPrinterSensor(Entity):
         return self._unit_of_measurement
 
     @property
-    def device_state_attributes(self):
+    def extra_state_attributes(self):
         """Return the state attributes of the sensor."""
         attr = {}
         attr[ATTR_ATTRIBUTION] = ATTRIBUTION
