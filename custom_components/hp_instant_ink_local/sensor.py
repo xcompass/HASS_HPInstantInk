@@ -1,16 +1,18 @@
 """
 @ Author      : Steven Tierney
 @ Description : HP Instant Ink Local - It queries the local HP Printer to obtain the page usage & Ink Levels
-@ Notes.      : The following resources from the XML are used: 
+@ Notes.      : The following resources from the XML are used:
                   - Subscription Impressions
                   - Total Impressions
-                  - Percentage Ink Level Remaining (Cyan/Magenta/Yellow)
+                  - Percentage Ink Level Remaining (Cyan)
+                  - Percentage Ink Level Remaining (Magenta)
+                  - Percentage Ink Level Remaining (Yellow)
                   - Percentage Ink Level Remaining (Black)
 
 To install do the following
 
 1. Copy this file and place it in your 'Home Assistant Config folder/custom_components/hp_instant_ink_local' folder.
-   
+
 2. On Line 41 below, update the URL to the XML page of your printer.
 
 3. Add the following paragraph to the configuration in sensor.yaml:
@@ -19,7 +21,9 @@ To install do the following
   resources:
     - sp
     - tp
-    - cr
+    - cy
+    - mg
+    - yl
     - br
 
 """
@@ -37,7 +41,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.util import Throttle
 
 _LOGGER = logging.getLogger(__name__)
-_RESOURCE = 'http://hp-envy.lan/DevMgmt/ProductUsageDyn.xml'
+_RESOURCE = 'http://192.168.10.6/DevMgmt/ProductUsageDyn.xml'
 
 ATTRIBUTION = 'Data provided by HP Printer'
 DEFAULT_ICON = 'mdi:printer'
@@ -48,13 +52,21 @@ MIN_TIME_BETWEEN_UPDATES = timedelta(minutes=5)
 """
 sp = Subscription Pages
 tp = Total Pages
+cy = Cyan Ink Remaining
+mg = Magenta Ink Remaining
+yl = Yellow Ink Remaining
+br = Black Ink Remaining
+cr = Colour Remaining (minimum of cy, mg, yl)
 """
 
 SENSOR_TYPES = {
     'sp': ['HP Printer Subscription Pages', ' '],
     'tp': ['HP Printer Total Pages', ' '],
-    'cr': ['HP Printer Colour Remaining', ' '],
+    'cy': ['HP Printer Cyan Remaining', ' '],
+    'mg': ['HP Printer Magenta Remaining', ' '],
+    'yl': ['HP Printer Yellow Remaining', ' '],
     'br': ['HP Printer Black Remaining', ' '],
+    'cr': ['HP Printer Colour Remaining', ' '],
 }
 
 PLATFORM_SCHEMA = PLATFORM_SCHEMA.extend({
@@ -67,13 +79,13 @@ def setup_platform(hass, config, add_devices, discovery_info=None):
     rest = HPPrinterData(_RESOURCE)
     sensors = []
     for resource in config[CONF_RESOURCES]:
-        sensors.append(HPPrinterSensor(resource,rest))
+        sensors.append(HPPrinterSensor(resource, rest))
 
     add_devices(sensors, True)
 
 
 class HPPrinterSensor(Entity):
-    """Implementing the CNN Futures sensor."""
+    """Implementing the HP Printer sensor."""
 
     def __init__(self, sensor_type, rest):
         """Initialize the sensor."""
@@ -92,9 +104,7 @@ class HPPrinterSensor(Entity):
     @property
     def icon(self):
         """Return the icon to use in the frontend, if any."""
-        if self.type in ['sp', 'tp', 'cr', 'br']:
-            icon = DEFAULT_ICON
-        return icon
+        return DEFAULT_ICON
 
     @property
     def state(self):
@@ -121,26 +131,19 @@ class HPPrinterSensor(Entity):
     def update(self):
         """Update current data."""
         self.rest.update()
-        if self.type == 'sp':
-            try:
-                self._state = int(self.rest.data[0])
-            except TypeError:
-                self._state = 'NA'
-        elif self.type == 'tp':
-            try:
-                self._state = int(self.rest.data[1])
-            except TypeError:
-                self._state = 'NA'
-        elif self.type == 'cr':
-            try:
-                self._state = int(self.rest.data[2])
-            except TypeError:
-                self._state = 'NA'
-        elif self.type == 'br':
-            try:
-                self._state = int(self.rest.data[3])
-            except TypeError:
-                self._state = 'NA'
+        try:
+            if self.type == 'cr':
+                # Colour remaining is the minimum of the three individual colour cartridges
+                self._state = min(
+                    int(self.rest.data['cy']),
+                    int(self.rest.data['mg']),
+                    int(self.rest.data['yl']),
+                )
+            else:
+                self._state = int(self.rest.data[self.type])
+        except (TypeError, KeyError):
+            self._state = 'NA'
+
 
 class HPPrinterData(object):
     """Gets data from the printer."""
@@ -148,38 +151,37 @@ class HPPrinterData(object):
     def __init__(self, resource):
         """Initialize the data object."""
         self._resource = resource
-        self.data = None
+        self.data = {}
         self.available = True
 
     @Throttle(MIN_TIME_BETWEEN_UPDATES)
     def update(self):
         """Get the latest data from the printer."""
-        return_data = []
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/70.0.3538.77 Safari/537.36'}
         try:
             r = requests.get(self._resource, headers=headers, timeout=10)
             doc = xmltodict.parse(r.content)
-            """Subscription Pages"""
-            xml_data = doc["pudyn:ProductUsageDyn"]["pudyn:PrinterSubunit"]["pudyn:SubscriptionImpressions"]
-            return_data.append(xml_data)
-            """Total Pages"""
-            xml_data = doc["pudyn:ProductUsageDyn"]["pudyn:PrinterSubunit"]["dd:TotalImpressions"]["#text"]
-            return_data.append(xml_data)
-            """Colour Ink Percentage Remaining"""
-            for tag in doc["pudyn:ProductUsageDyn"]["pudyn:ConsumableSubunit"]["pudyn:Consumable"]:
-                if tag["dd:MarkerColor"] == "CyanMagentaYellow":
-                    xml_data = tag["dd:ConsumableRawPercentageLevelRemaining"]
-                    return_data.append(xml_data)
-                    break
-            """Black Ink Percentage Remaining"""
-            for tag in doc["pudyn:ProductUsageDyn"]["pudyn:ConsumableSubunit"]["pudyn:Consumable"]:
-                if tag["dd:MarkerColor"] == "Black":
-                    xml_data = tag["dd:ConsumableRawPercentageLevelRemaining"]
-                    return_data.append(xml_data)
-                    break
-            self.data = return_data
+            printer = doc["pudyn:ProductUsageDyn"]["pudyn:PrinterSubunit"]
+
+            data = {}
+            data['sp'] = printer["pudyn:SubscriptionImpressions"]
+            data['tp'] = printer["dd:TotalImpressions"]["#text"]
+
+            for consumable in doc["pudyn:ProductUsageDyn"]["pudyn:ConsumableSubunit"]["pudyn:Consumable"]:
+                color = consumable["dd:MarkerColor"]
+                level = consumable["dd:ConsumableRawPercentageLevelRemaining"]
+                if color == "Cyan":
+                    data['cy'] = level
+                elif color == "Magenta":
+                    data['mg'] = level
+                elif color == "Yellow":
+                    data['yl'] = level
+                elif color == "Black":
+                    data['br'] = level
+
+            self.data = data
             self.available = True
         except requests.exceptions.ConnectionError:
             _LOGGER.error('Connection error')
-            self.data = None
+            self.data = {}
             self.available = False

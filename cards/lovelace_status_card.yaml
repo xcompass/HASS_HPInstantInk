@@ -1,15 +1,15 @@
 type: grid
 cards:
   - entities:
-      - entity: sensor.hp_envy_5540_allowance_days_remaining
-      - entity: sensor.hp_envy_5540_pages_allowance_remaining
-      - entity: sensor.hp_envy_5540_pages_rollover_remaining
-      - entity: sensor.hp_envy_5540_total_free_pages_remaining
-      - entity: sensor.hp_envy_5540_pages_overprint
-      - entity: sensor.hp_envy_5540_pages_overprint_cost
-      - entity: sensor.hp_envy_5540_pages_overprint_remaining
+      - entity: sensor.hp_officejet_6962_allowance_days_remaining
+      - entity: sensor.hp_officejet_6962_pages_allowance_remaining
+      - entity: sensor.hp_officejet_6962_pages_rollover_remaining
+      - entity: sensor.hp_officejet_6962_total_free_pages_remaining
+      - entity: sensor.hp_officejet_6962_pages_overprint
+      - entity: sensor.hp_officejet_6962_pages_overprint_cost
+      - entity: sensor.hp_officejet_6962_pages_overprint_remaining
     type: entities
-    title: HP Envy 5540 Status
+    title: HP OfficeJet 6962 Status
   - cards:
       - entity: sensor.hp_printer_black_remaining
         max: 100
@@ -17,10 +17,22 @@ cards:
         name: Black Ink
         type: gauge
         unit: "%"
-      - entity: sensor.hp_printer_colour_remaining
+      - entity: sensor.hp_printer_cyan_remaining
         max: 100
         min: 0
-        name: Tri-Colour Ink
+        name: Cyan Ink
+        type: gauge
+        unit: "%"
+      - entity: sensor.hp_printer_magenta_remaining
+        max: 100
+        min: 0
+        name: Magenta Ink
+        type: gauge
+        unit: "%"
+      - entity: sensor.hp_printer_yellow_remaining
+        max: 100
+        min: 0
+        name: Yellow Ink
         type: gauge
         unit: "%"
     type: horizontal-stack

@@ -1,0 +1,362 @@
+# /config/packages/hp_officejet_6962_instant_ink.yaml
+
+##################################################################################################################
+# Inputs
+##################################################################################################################
+
+# Inputs for the HP Ink Print Plan
+input_number:
+# The total number of pages that had been printed
+# at the start of this period of the printing plan
+# Set by an automation
+  hp_officejet_6962_pages_at_month_start:
+    name: Printed Pages Total at month start
+    min: 500
+    max: 10000
+    step: 1
+    icon: mdi:printer
+    mode: box
+# The current monthly allowance number of pages
+# SET THIS ONCE FOR THE INAUGURAL RUN, and after then it is set by an automation
+  hp_officejet_6962_pages_monthly_allowance:
+    name: Monthly Allowance Pages
+    min: 15
+    max: 300
+    step: 1
+    icon: mdi:printer
+    mode: box
+# The maximum number of rollover pages allowed.
+# SET THIS ACCORDING TO YOUR PLAN
+  hp_officejet_6962_pages_rollover_monthly_max_allowance:
+    name: Rollover Maximum Pages
+    min: 0
+    max: 600
+    step: 1
+    icon: mdi:printer
+    mode: box
+# The number of pages that remain of the rollover allowance for this month
+# SET THIS ONCE FOR THE INAUGURAL RUN, and after then it is set by an automation
+  hp_officejet_6962_pages_rollover_allowance:
+    name: Rollover Allowance Pages
+    min: 0
+    max: 600
+    step: 1
+    icon: mdi:printer
+    mode: box
+# The number of pages in each overprint block, when
+# the Monthly Allowance plus Rollover are exceeded
+# SET THIS ACCORDING TO YOUR PLAN
+  hp_officejet_6962_pages_overprint_block_size:
+    name: Over Print Block Size
+    min: 0
+    max: 100
+    step: 1
+    icon: mdi:printer
+    mode: box
+# The cost of each overprint block, in £
+# SET THIS ACCORDING TO YOUR PLAN
+  hp_officejet_6962_pages_overprint_block_cost:
+    name: Over Print Block Cost
+    min: 0
+    max: 50
+    step: 0.01
+    icon: mdi:currency-gbp
+    mode: box
+# The number of free pages remaining to trigger a notification
+  hp_officejet_6962_free_pages_remaining_notification:
+    name: Free Pages Notification
+    min: 1
+    max: 15000
+    step: 1
+    icon: mdi:printer
+    mode: box
+
+## A helper to store the total number of pages printed, to make it set
+## the sensor.hp_officejet_6962_total_pages_printed, after a reboot, and if
+## the printer is switched off.
+  hp_officejet_6962_total_pages_printed_inp:
+    name: Set Total Pages Printed
+    min: 1
+    max: 150000
+    step: 1
+    icon: mdi:printer
+    mode: box
+## Helpers to store individual ink levels, to make it set the graph
+## after a reboot, and if the printer is switched off.
+  hp_officejet_6962_black_ink:
+    name: Black Ink
+    min: 0
+    max: 100
+    step: 1
+    icon: mdi:printer
+    mode: box
+    unit_of_measurement: '%'
+  hp_officejet_6962_cyan_ink:
+    name: Cyan Ink
+    min: 0
+    max: 100
+    step: 1
+    icon: mdi:printer
+    mode: box
+    unit_of_measurement: '%'
+  hp_officejet_6962_magenta_ink:
+    name: Magenta Ink
+    min: 0
+    max: 100
+    step: 1
+    icon: mdi:printer
+    mode: box
+    unit_of_measurement: '%'
+  hp_officejet_6962_yellow_ink:
+    name: Yellow Ink
+    min: 0
+    max: 100
+    step: 1
+    icon: mdi:printer
+    mode: box
+    unit_of_measurement: '%'
+
+# The start date of this period of the print plan
+# SET THIS ONCE FOR THE INAUGURAL RUN, and after then it is set by an automation
+input_datetime:
+  hp_officejet_6962_this_period_start_date:
+    name: This Period Start Date
+    has_date: true
+    has_time: false
+    icon: mdi:calendar
+
+# SET THIS ACCORDING TO YOUR PLAN
+input_select:
+  hp_officejet_6962_print_plan:
+    name: Print Plan
+    options:
+      - Free
+      - Paid
+    initial: Free
+    icon: mdi:printer
+
+##################################################################################################################
+# Sensors
+##################################################################################################################
+sensor:
+- platform: template
+  sensors:
+    # The number of pages printed, stored in the input_number in case the printer
+    # is switched off and Home Assistant is restarted
+    hp_officejet_6962_total_pages_printed:
+      value_template: >-
+        {% if states('sensor.hp_printer_total_pages') == 'unavailable' -%}
+            {{ states('input_number.hp_officejet_6962_total_pages_printed_inp')|int }}
+        {%- else -%}
+            {{ states('sensor.hp_printer_total_pages')|int }}
+        {%- endif %}
+
+#
+# The number of allowance pages remaining for this period
+    hp_officejet_6962_pages_allowance_remaining:
+      friendly_name: "Allowance Pages Remaining"
+      value_template: >-
+          {% if states('input_number.hp_officejet_6962_pages_at_month_start')|int + states('input_number.hp_officejet_6962_pages_monthly_allowance')|int - states('sensor.hp_officejet_6962_total_pages_printed')|int >= 0 %}
+            {{ states('input_number.hp_officejet_6962_pages_at_month_start')|int + states('input_number.hp_officejet_6962_pages_monthly_allowance')|int - states('sensor.hp_officejet_6962_total_pages_printed')|int }}
+          {% else %}
+            0
+          {% endif %}
+
+    # Next Renewal Date
+    # WILL NOT WORK FOR 29th, 30th, 31st OF THE MONTH
+    hp_officejet_6962_next_renewal_date:
+      friendly_name: HP OfficeJet 6962 Next Renewal Date
+      value_template: >-
+          {% if (states('input_datetime.hp_officejet_6962_this_period_start_date').split("-")[1]|int + 1 > 12) %}
+            {{ (states('input_datetime.hp_officejet_6962_this_period_start_date').split("-")[0]|int + 1)|string + "-01-" + states('input_datetime.hp_officejet_6962_this_period_start_date').split("-")[2] }}
+          {% else %}
+            {{ states('input_datetime.hp_officejet_6962_this_period_start_date').split("-")[0]|int|string + "-" +  ('%02d' % (states('input_datetime.hp_officejet_6962_this_period_start_date').split("-")[1]|int + 1)) + "-" + states('input_datetime.hp_officejet_6962_this_period_start_date').split("-")[2] }}
+          {% endif %}
+
+#
+# Used to track days remaining of HP Ink Printer Pages period
+    hp_officejet_6962_allowance_days_remaining:
+      friendly_name: "Allowance Days Remaining"
+      value_template: >-
+          {{ ((as_timestamp(strptime(states('sensor.hp_officejet_6962_next_renewal_date')[0:10], '%Y-%m-%d')) - as_timestamp(strptime(states('sensor.date')[0:10], '%Y-%m-%d')))/84600)|int }}
+
+#
+# The number of rollover pages remaining for this period.
+    hp_officejet_6962_pages_rollover_remaining:
+      friendly_name: "Rollover Pages Remaining"
+      value_template: >-
+          {% if states('input_number.hp_officejet_6962_pages_at_month_start')|int + states('input_number.hp_officejet_6962_pages_monthly_allowance')|int - states('sensor.hp_officejet_6962_total_pages_printed')|int < 0 and states('input_number.hp_officejet_6962_pages_at_month_start')|int + states('input_number.hp_officejet_6962_pages_monthly_allowance')|int + states('input_number.hp_officejet_6962_pages_rollover_allowance')|int - states('sensor.hp_officejet_6962_total_pages_printed')|int >= 0 %}
+            {{ states('input_number.hp_officejet_6962_pages_at_month_start')|int + states('input_number.hp_officejet_6962_pages_monthly_allowance')|int + states('input_number.hp_officejet_6962_pages_rollover_allowance')|int - states('sensor.hp_officejet_6962_total_pages_printed')|int }}
+          {% elif states('input_number.hp_officejet_6962_pages_at_month_start')|int + states('input_number.hp_officejet_6962_pages_monthly_allowance')|int - states('sensor.hp_officejet_6962_total_pages_printed')|int < 0 and states('input_number.hp_officejet_6962_pages_at_month_start')|int + states('input_number.hp_officejet_6962_pages_monthly_allowance')|int + states('input_number.hp_officejet_6962_pages_rollover_allowance')|int -   states('sensor.hp_officejet_6962_total_pages_printed')|int < 0 %}
+            0
+          {% else %}
+            {{ states('input_number.hp_officejet_6962_pages_rollover_allowance')|int }}
+          {% endif %}
+
+#
+# Total number of bundled plus rollover pages remaining
+    hp_officejet_6962_total_free_pages_remaining:
+      friendly_name: "Total Free Pages Remaining"
+      value_template: >-
+          {% if states('sensor.hp_officejet_6962_pages_rollover_remaining'),0 != 0 %}
+            {{ states('sensor.hp_officejet_6962_pages_allowance_remaining')|int + states('sensor.hp_officejet_6962_pages_rollover_remaining')|int }}
+          {% endif %}
+
+#
+# The number pages printed over and above the Monthly Allowance plus the Rollover Allowance
+    hp_officejet_6962_pages_overprint:
+      friendly_name: "Over Allowance Prints"
+      value_template: >-
+          {% if states('input_number.hp_officejet_6962_pages_at_month_start')|int + states('input_number.hp_officejet_6962_pages_monthly_allowance')|int + states('input_number.hp_officejet_6962_pages_rollover_allowance')|int < states('sensor.hp_officejet_6962_total_pages_printed')|int %}
+            {{ states('sensor.hp_officejet_6962_total_pages_printed')|int - states('input_number.hp_officejet_6962_pages_rollover_allowance')|int - states('input_number.hp_officejet_6962_pages_monthly_allowance')|int - states('input_number.hp_officejet_6962_pages_at_month_start')|int }}
+          {% else %}
+            0
+          {% endif %}
+
+# The cost so far of the pages that have been printed over the Allowance plus Rollover
+# CHANGE THE CURRENCY CODE AS APPROPRIATE
+    hp_officejet_6962_pages_overprint_cost:
+      friendly_name: "Over Allowance Cost"
+      value_template: >-
+        {% if states('sensor.hp_officejet_6962_total_pages_printed') and states('sensor.hp_officejet_6962_pages_allowance_remaining') %}
+          {% if states('sensor.hp_officejet_6962_pages_overprint')|int == 0 %}
+            0
+          {% elif states('sensor.hp_officejet_6962_pages_overprint')|int > 0 and ( (states('sensor.hp_officejet_6962_pages_overprint')|int - 1) % states('input_number.hp_officejet_6962_pages_overprint_block_size')|int == 0 ) %}
+            {{ (1 + ((states('sensor.hp_officejet_6962_pages_overprint')|int - 1) / states('input_number.hp_officejet_6962_pages_overprint_block_size')|int)) | multiply( states('input_number.hp_officejet_6962_pages_overprint_block_cost')|int)|int  }}
+          {% else %}
+            {{ (1 + ((states('sensor.hp_officejet_6962_pages_overprint')|int - 1) / states('input_number.hp_officejet_6962_pages_overprint_block_size')|int)) | multiply( states('input_number.hp_officejet_6962_pages_overprint_block_cost')|int)|int  }}
+          {% endif %}
+        {% endif %}
+      unit_of_measurement: '£'
+
+    # The number of pages remaining for this month in the chargeable Over Allowance area
+    hp_officejet_6962_pages_overprint_remaining:
+      friendly_name: "Over Allowance Prints Remaining"
+      value_template: >-
+        {% if states('sensor.hp_officejet_6962_pages_overprint')|int == 0 or (states('sensor.hp_officejet_6962_pages_overprint')|int % states('input_number.hp_officejet_6962_pages_overprint_block_size')|int == 0) %}
+          0
+        {% else %}
+          {{ states('input_number.hp_officejet_6962_pages_overprint_block_size')|int - (states('sensor.hp_officejet_6962_pages_overprint')|int % states('input_number.hp_officejet_6962_pages_overprint_block_size')|int) }}
+        {% endif %}
+
+
+##################################################################################################################
+# Automations
+##################################################################################################################
+
+automation:
+- id: '1588925532080'
+  alias: HP OfficeJet 6962 Page Reset
+  description: 'Sets: - Total number of pages printed at the start of the period -
+    Start Date of this period (to store a date to calculate the next one) - Maximum
+    Rollover Allowance value for this month - Rollover Remaining to new Maximum Rollover
+    Allowance value for this month - Rollover from overprint pages'
+  trigger:
+  - at: 00:00:05
+    platform: time
+  condition:
+  - condition: template
+    value_template: '{{ now().day|int == states(''input_datetime.hp_officejet_6962_this_period_start_date'')[-2:]|int
+      }}'
+  action:
+  - service: input_number.set_value
+    entity_id: input_number.hp_officejet_6962_pages_rollover_allowance
+    data_template:
+       value: '{% if is_state(''input_select.hp_officejet_6962_print_plan'' , ''Free'') %}
+                {## -=-=-= Free Plans accrue rollovers only from the OverPrint counter =-=-=- ##}
+                {% if states(''sensor.hp_officejet_6962_pages_overprint_remaining'')|int > 0 %}
+                  {## -=-=-= If the OverPrint is in use, both the standard and rollover pages have been exhausted =-=-=- ##}
+                  {{ states(''sensor.hp_officejet_6962_pages_overprint_remaining'')|int }}
+                {% else %}
+                  {## -=-=-= If the OverPrint is not in use, then however many rollover pages that remain get carried over =-=-=- ##}
+                  {{ states(''sensor.hp_officejet_6962_pages_rollover_remaining'')|int }}
+                {% endif %}
+              {% else %}
+                {## -=-=-= Paid Plans accrue rollovers from both Unused Standard Prints, and from the OverPrint counter =-=-=- ##}
+                {% if states(''sensor.hp_officejet_6962_pages_overprint'')|int > 0 and (states(''sensor.hp_officejet_6962_pages_overprint'')|int % states(''input_number.hp_officejet_6962_pages_overprint_block_size'')|int) > 0 %}
+                  {## -=-=-= If the OverPrint is in use, both the standard and rollover pages have been exhausted =-=-=- ##}
+                  {{ states(''input_number.hp_officejet_6962_pages_overprint_block_size'')|int - (states(''sensor.hp_officejet_6962_pages_overprint'')|int % states(''input_number.hp_officejet_6962_pages_overprint_block_size'')|int) }}
+                {% elif states(''sensor.hp_officejet_6962_total_free_pages_remaining'')|int > states(''input_number.hp_officejet_6962_pages_rollover_monthly_max_allowance'')|int %}
+                  {## -=-=-= The OverPrint is not in use, so the sum of the Unused Standard Pages plus the Unused Rollover get carried over, subject to the Max Rollover Allowance =-=-=- ##}
+                  {{ states(''input_number.hp_officejet_6962_pages_rollover_monthly_max_allowance'')|int }}
+                {% else %}
+                  {{ states(''sensor.hp_officejet_6962_total_free_pages_remaining'')|int }}
+                {% endif %}
+              {% endif %}'
+  - service: input_number.set_value
+    entity_id: input_number.hp_officejet_6962_pages_at_month_start
+    data_template:
+      value: '{{ states(''sensor.hp_officejet_6962_total_pages_printed'') }}'
+  - service: input_datetime.set_datetime
+    entity_id: input_datetime.hp_officejet_6962_this_period_start_date
+    data_template:
+      date: '{{ states(''sensor.date'') }}'
+
+##################################################################################################################
+- id: '1588925532191'
+  alias: HP OfficeJet 6962 Alert if remaining Free Pages count is X pages
+  description: Sends an alert if the HP OfficeJet 6962 Free Pages count is 'sensor.hp_officejet_6962_free_pages_remaining_notification'
+    pages
+  trigger:
+  - platform: template
+    value_template: '{% if states(''sensor.hp_officejet_6962_total_free_pages_remaining''),0|int
+      == states(''sensor.hp_officejet_6962_free_pages_remaining_notification''),1|int %}
+
+      true
+
+      {% endif %}'
+  condition: []
+  action:
+  - service: notify.mobile_app_nexus_10
+    data:
+      message: The number of free pages is running low
+      title: 'HP Ink: Free Pages alert'
+##################################################################################################################
+- id: '1653739817420'
+  alias: HP OfficeJet 6962 change of Total Pages Printed
+  description: 'Sets the input_number values for
+
+    - Total Pages Printed
+
+    - Black Ink
+
+    - Cyan Ink
+
+    - Magenta Ink
+
+    - Yellow Ink
+
+
+    These allow current values to show if Home Assistant is rebooted while the printer
+    is switched off'
+  trigger:
+  - platform: template
+    value_template: '{{ states("sensor.hp_printer_total_pages")|default("-1") != "-1" }}'
+  condition: []
+  action:
+  - service: input_number.set_value
+    data:
+      value: '{{ states("sensor.hp_officejet_6962_total_pages_printed")|int }}'
+    target:
+      entity_id: input_number.hp_officejet_6962_total_pages_printed_inp
+  - service: input_number.set_value
+    data:
+      value: '{{ states("sensor.hp_printer_black_remaining")|int }}'
+    target:
+      entity_id: input_number.hp_officejet_6962_black_ink
+  - service: input_number.set_value
+    data:
+      value: '{{ states("sensor.hp_printer_cyan_remaining")|int }}'
+    target:
+      entity_id: input_number.hp_officejet_6962_cyan_ink
+  - service: input_number.set_value
+    data:
+      value: '{{ states("sensor.hp_printer_magenta_remaining")|int }}'
+    target:
+      entity_id: input_number.hp_officejet_6962_magenta_ink
+  - service: input_number.set_value
+    data:
+      value: '{{ states("sensor.hp_printer_yellow_remaining")|int }}'
+    target:
+      entity_id: input_number.hp_officejet_6962_yellow_ink
+  mode: single
